@@ -1,0 +1,459 @@
+#include <stdio.h>
+#include <conio.h>
+#include <stdbool.h>
+#include <stdlib.h>
+#include "start.h"
+
+#define MAXBULLET 8
+#define MAXSTONE 5
+
+typedef struct _player
+{
+	int PosX, PosY;	//플레이어 좌표
+	bool isLive;	//생존여부
+	bool shield;
+}Player;
+
+typedef struct _bullet
+{
+	int PosX, PosY;	//총알 좌표
+	bool isLive;	//총알 유무
+}Bullet[MAXBULLET];
+
+typedef struct _enemy
+{
+	int PosX, PosY;	//적 좌표
+	bool isLive;	//생존여부
+}Enemy;
+
+typedef struct _stone
+{
+	int PosX, PosY;
+	bool isLive;
+}Stone[MAXSTONE];
+
+Player player;
+Bullet bullet;
+Enemy enemy;
+Enemy enemy2;
+Stone stone;
+Stone stone2;
+
+int score = 0;
+int shieldtime = 5;
+
+void PrintMap();	//맵 출력
+void PrintPlayer();	//플레이어 출력
+void CreatEnemy();	//적 생성
+void PrintEnemy();	//적 출력
+bool IsKeyDown(int key);	//무슨키가 눌렸는지 검사
+void KeyInput();	//키 입력 함수
+void CreatBullet();	//총알 생성
+void PrintBullet();	//총알 이동 및 출력
+void EnemyDead();	//적 생존 여부
+void CreatStone();	//함정 생성 함수
+void PrintStone();	//함정 이동 함수
+void PlayerDead();	//플레이어 충돌 함수
+void UI();	//하단 점수 표시
+
+int main()
+{
+	int gamespeed = 0;
+
+	showcursor(false);	//커서 숨기기
+	clrscr();
+
+	enemy.PosX = 50;
+	enemy.PosY = 50;
+	enemy2.PosX = 50;
+	enemy2.PosY = 50;
+
+	PrintMap();	//맵그리기
+	PrintPlayer();	//플레이어 그리기
+	PrintEnemy();
+	PrintStone();
+
+	randomize();
+
+	while(true)
+	{
+		PlayerDead();	//플레이어 충돌 함수
+		KeyInput();		//키 입력
+		PrintBullet();	//총알 이동 및 출력
+		delay(50 - gamespeed);
+		CreatStone();	//함정 생성 함수
+		PrintStone();	//함정 이동 함수
+		CreatEnemy();	//적 생성 함수
+		PrintEnemy();	//적 이동 함수
+		EnemyDead();	//적 생존여부 판단
+		PrintBullet();	//총알 이동 및 출력
+		score++;
+		UI(score);	//하단 점수 표시
+		if (score % 100 == 0)	//점수 100점마다 게임스피드 2 상승
+			gamespeed+=2;
+		if(player.isLive == false)	//게임오버
+		{
+			while (true)
+			{
+				gotoxy(16, 10);
+				printf("GAME OVER");
+				if (IsKeyDown(VK_ESCAPE))
+				{
+					break;
+				}
+			}
+		}
+		if (score >= 1000)	//게임클리어
+		{
+			while (true)
+			{
+				gotoxy(16, 10);
+				printf("GAME CLEAR");
+				if (IsKeyDown(VK_ESCAPE))
+					break;
+			}
+		}
+		if (IsKeyDown(VK_ESCAPE))	//게임종료
+		{
+			gotoxy(0, 22);
+			break;
+		}
+	}
+	return 0;
+}
+
+void PrintMap()
+{
+	for (int i = 0; i < 40; i++)
+	{
+		gotoxy(i, 0);
+		printf("-");
+		gotoxy(i, 20);
+		printf("-");
+	}
+	for (int i = 0; i < 20; i++)
+	{
+		gotoxy(0, i);
+		printf("I");
+		gotoxy(40, i);
+		printf("I");
+	}
+}
+
+void PrintPlayer()
+{
+	player.isLive = true;	//플레이어 생존여부
+	player.PosX = 4;	//플레이어 초기값(x)
+	player.PosY = 17;	//플레이어 초기값(y)
+	gotoxy(player.PosX, player.PosY);
+	printf("o");
+}
+
+void CreatEnemy()
+{
+	if (enemy.isLive == false)
+	{
+		int rnd = random(30);
+		if (rnd != 0)
+			return;
+		enemy.isLive = true;
+		enemy.PosX = 30;
+		enemy.PosY = 17;
+		gotoxy(enemy.PosX, enemy.PosY);
+		printf("M");
+	}
+	if (enemy2.isLive == false)
+	{
+		int rnd = random(30);
+		if (rnd != 0)
+			return;
+		enemy2.isLive = true;
+		enemy2.PosX = 30;
+		enemy2.PosY = 2;
+		gotoxy(enemy2.PosX, enemy2.PosY);
+		printf("W");
+	}
+}
+
+void PrintEnemy()
+{
+	if (enemy.isLive == true)
+	{
+		gotoxy(enemy.PosX, enemy.PosY);
+		printf("  ");
+		enemy.PosX--;
+		if (enemy.PosX < 1)
+		{
+			enemy.isLive = false;
+			return;
+		}
+		gotoxy(enemy.PosX, enemy.PosY);
+		printf("M");
+	}
+	if (enemy2.isLive == true)
+	{
+		gotoxy(enemy2.PosX, enemy2.PosY);
+		printf("  ");
+		enemy2.PosX--;
+		if (enemy2.PosX < 1)
+		{
+			enemy2.isLive = false;
+			return;
+		}
+		gotoxy(enemy2.PosX, enemy2.PosY);
+		printf("W");
+	}
+}
+
+bool IsKeyDown(int key)
+{
+	return ((GetAsyncKeyState(key) & 0x8000) != 0);
+	//GetAsynKeyState : 현재 키가 무슨키인지 확인
+	//0x8000 : 이전에 누른적 없고 호출 시점에 눌려있는 상태
+}
+
+void KeyInput()
+{
+	if (IsKeyDown(VK_SPACE))
+	{
+		CreatBullet();
+	}
+	if (IsKeyDown(VK_UP))
+	{
+		for (int i = 0; i < 15; i++)
+		{
+			gotoxy(player.PosX, player.PosY);
+			printf("  ");
+			if(player.PosY > 2)
+				player.PosY--;
+			gotoxy(player.PosX, player.PosY);
+			printf("o");
+		}
+	}
+	if (IsKeyDown(VK_DOWN))
+	{
+		for (int i = 0; i < 15; i++)
+		{
+			gotoxy(player.PosX, player.PosY);
+			printf("  ");
+			if(player.PosY < 17)
+				player.PosY++;
+			gotoxy(player.PosX, player.PosY);
+			printf("o");
+		}
+	}
+	if (IsKeyDown(VK_MENU) && shieldtime > 0)	//ALT키(쉴드)
+	{
+		player.shield = true;
+		shieldtime--;
+		gotoxy(player.PosX, player.PosY);
+		printf("  ");
+		gotoxy(player.PosX, player.PosY);
+		printf("o");
+	}
+	else
+	{
+		player.shield = false;
+		if(score % 10 == 0 && shieldtime < 5)	//10프레임마다 쉴드게이지1상승
+			shieldtime++;
+	}
+}
+
+void CreatBullet()
+{
+	for (int i = 0; i < MAXBULLET; i++)
+	{
+		if (bullet[i].isLive == false)
+		{
+			bullet[i].PosX = player.PosX + 3;
+			bullet[i].PosY = player.PosY;
+			bullet[i].isLive = true;
+			return;
+		}
+	}
+}
+
+void PrintBullet()
+{
+	for (int i = 0; i < MAXBULLET; i++)
+	{
+		if (bullet[i].isLive == true)
+		{
+			gotoxy(bullet[i].PosX, bullet[i].PosY);
+			printf("  ");
+			bullet[i].PosX++;
+			gotoxy(bullet[i].PosX, bullet[i].PosY);
+			printf("-");
+			if (bullet[i].PosX >= 38)
+			{
+				gotoxy(bullet[i].PosX, bullet[i].PosY);
+				printf("  ");
+				bullet[i].isLive = false;
+			}
+		}
+	}
+}
+
+void EnemyDead()
+{
+	for (int i = 0; i < MAXBULLET; i++)
+	{
+		if (bullet[i].PosX == enemy.PosX && bullet[i].PosY == enemy.PosY || bullet[i].PosX == (enemy.PosX - 1) && bullet[i].PosY == enemy.PosY)
+		{
+			gotoxy(bullet[i].PosX, bullet[i].PosY);
+			printf("  ");
+			bullet[i].isLive = false;
+			gotoxy(enemy.PosX, enemy.PosY);
+			printf("  ");
+			enemy.isLive = false;
+			enemy.PosX = 0;
+			enemy.PosY = 0;
+			bullet[i].PosX = 60;
+			bullet[i].PosY = 60;
+			score += 10;
+		}
+		if (bullet[i].PosX == enemy2.PosX && bullet[i].PosY == enemy2.PosY || bullet[i].PosX == (enemy2.PosX - 1) && bullet[i].PosY == enemy2.PosY)
+		{
+			gotoxy(bullet[i].PosX, bullet[i].PosY);
+			printf("  ");
+			bullet[i].isLive = false;
+			gotoxy(enemy2.PosX, enemy2.PosY);
+			printf("  ");
+			enemy2.isLive = false;
+			enemy2.PosX = 0;
+			enemy2.PosY = 0;
+			bullet[i].PosX = 60;
+			bullet[i].PosY = 60;
+			score += 10;
+		}
+	}
+	for (int i = 0; i < MAXSTONE; i++)
+	{
+		if (stone[i].PosX == 1)
+		{
+			gotoxy(stone[i].PosX, stone[i].PosY);
+			printf("  ");
+			stone[i].isLive = false;
+			stone[i].PosX = 55;
+			stone[i].PosY = 55;
+		}
+		if (stone2[i].PosX == 1)
+		{
+			gotoxy(stone2[i].PosX, stone2[i].PosY);
+			printf("  ");
+			stone2[i].isLive = false;
+			stone2[i].PosX = 55;
+			stone2[i].PosY = 55;
+		}
+	}
+}
+
+void UI()	//아래랑 오른쪽 UI
+{
+	gotoxy(0, 21);
+	printf("score : %d", score);
+	gotoxy(0, 22);
+	printf("shieldtime : %d", shieldtime);
+	gotoxy(44, 1);
+	printf("UP : ↑");
+	gotoxy(44, 2);
+	printf("DOWN : ↓");
+	gotoxy(44, 3);
+	printf("SHOOTING : SPACE");
+	gotoxy(44, 4);
+	printf("SHIELD : ALT");
+}
+
+void CreatStone()
+{
+	for (int i = 0; i < MAXSTONE; i++)
+	{
+		if (stone[i].isLive == false)
+		{
+			int rnd = random(15);
+			if (rnd != 0)
+				return;
+			stone[i].isLive = true;
+			stone[i].PosX = 30;
+			stone[i].PosY = 2;
+			gotoxy(stone[i].PosX, stone[i].PosY);
+			printf("▽");
+		}
+		if (stone2[i].isLive == false)
+		{
+			int rnd2 = random(15);
+			if (rnd2 != 0)
+				return;
+			stone2[i].isLive = true;
+			stone2[i].PosX = 30;
+			stone2[i].PosY = 17;
+			gotoxy(stone2[i].PosX, stone2[i].PosY);
+			printf("△");
+		}
+		if ((abs(stone[i].PosX - stone2[i].PosX)) < 5)
+		{//위에 함정과 아래 함정의 PosX값의 차이가 작다면 피할수가 없어 차이를 벌려줌
+			stone2[i].PosX += 5;
+		}
+	}
+}
+
+void PrintStone()
+{
+	for (int i = 0; i < MAXSTONE; i++)
+	{
+		if (stone[i].isLive == true)
+		{
+			gotoxy(stone[i].PosX, stone[i].PosY);
+			printf("  ");
+			stone[i].PosX -= 1;
+			if (stone[i].PosX < 1)
+			{
+				stone[i].isLive = false;
+				return;
+			}
+			gotoxy(stone[i].PosX, stone[i].PosY);
+			printf("▽");
+		}
+		if (stone2[i].isLive == true)
+		{
+			gotoxy(stone2[i].PosX, stone2[i].PosY);
+			printf("  ");
+			stone2[i].PosX -= 1;
+			if (stone2[i].PosX < 1)
+			{
+				stone2[i].isLive = false;
+				return;
+			}
+			gotoxy(stone2[i].PosX, stone2[i].PosY);
+			printf("△");
+		}
+	}
+}
+
+void PlayerDead()
+{
+	if (player.shield == false)
+	{
+		if (player.PosX == enemy.PosX && player.PosY == enemy.PosY)
+		{
+			gotoxy(player.PosX, player.PosY);
+			printf("  ");
+			player.isLive = false;
+		}
+		for (int i = 0; i < MAXSTONE; i++)
+		{
+			if (player.PosX == stone[i].PosX && player.PosY == stone[i].PosY)
+			{
+				gotoxy(player.PosX, player.PosY);
+				printf("  ");
+				player.isLive = false;
+			}
+			if (player.PosX == stone2[i].PosX && player.PosY == stone2[i].PosY)
+			{
+				gotoxy(player.PosX, player.PosY);
+				printf("  ");
+				player.isLive = false;
+			}
+		}
+	}
+}
